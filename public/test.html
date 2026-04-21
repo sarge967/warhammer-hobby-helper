@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warhammer Hobby Helper — Diagnostics</title>
+  <style>
+    body { font-family: monospace; background: #0a0806; color: #e8d5b0; padding: 24px; max-width: 700px; margin: 0 auto; }
+    h1 { color: #c8912a; margin-bottom: 6px; font-size: 18px; }
+    .sub { color: rgba(232,213,176,0.5); margin-bottom: 28px; font-size: 13px; }
+    .test { background: rgba(255,255,255,0.04); border: 1px solid rgba(200,145,42,0.2); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
+    .test-title { color: #c8912a; font-size: 13px; margin-bottom: 10px; }
+    .status { padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-top: 8px; }
+    .pending  { background: rgba(100,100,100,0.2); color: #aaa; }
+    .running  { background: rgba(200,145,42,0.15); color: #c8912a; }
+    .pass     { background: rgba(30,115,49,0.2); color: #4ec86a; border: 1px solid rgba(30,115,49,0.4); }
+    .fail     { background: rgba(180,40,40,0.2); color: #e88888; border: 1px solid rgba(200,60,60,0.4); }
+    button { background: linear-gradient(135deg,#8b4513,#c8912a); border: none; color: #0a0806; font-weight: 700; font-size: 13px; padding: 12px 28px; border-radius: 4px; cursor: pointer; margin-bottom: 24px; font-family: monospace; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .detail { font-size: 11px; color: rgba(232,213,176,0.5); margin-top: 6px; word-break: break-all; white-space: pre-wrap; }
+    .fix { background: rgba(200,145,42,0.08); border-left: 3px solid #c8912a; padding: 10px 14px; margin-top: 10px; font-size: 12px; color: rgba(232,213,176,0.8); line-height: 1.6; display: none; }
+    .fix a { color: #c8912a; }
+  </style>
+</head>
+<body>
+
+<h1>⚔ Warhammer Hobby Helper — Diagnostics</h1>
+<p class="sub">This page tests whether the AI colour theory feature is set up correctly. Click the button to run all checks.</p>
+
+<button id="runBtn" onclick="runAll()">Run Diagnostics</button>
+
+<div class="test">
+  <div class="test-title">Test 1 — Can the app reach the proxy function?</div>
+  <div class="status pending" id="t1status">Not run yet</div>
+  <div class="detail" id="t1detail"></div>
+  <div class="fix" id="t1fix">
+    The Netlify function isn't being found. Make sure:<br>
+    • The file <code>netlify/functions/claude.js</code> exists in your GitHub repo<br>
+    • Your <code>netlify.toml</code> contains <code>functions = "netlify/functions"</code><br>
+    • Try triggering a fresh deploy in Netlify → Deploys → Trigger deploy
+  </div>
+</div>
+
+<div class="test">
+  <div class="test-title">Test 2 — Is the GEMINI_API_KEY environment variable set?</div>
+  <div class="status pending" id="t2status">Not run yet</div>
+  <div class="detail" id="t2detail"></div>
+  <div class="fix" id="t2fix">
+    The API key isn't set. To fix:<br>
+    1. Go to your Netlify site → <strong>Site configuration → Environment variables</strong><br>
+    2. Click <strong>Add a variable</strong><br>
+    3. Key: <code>GEMINI_API_KEY</code> &nbsp; Value: your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a><br>
+    4. Save, then go to <strong>Deploys → Trigger deploy → Deploy site</strong>
+  </div>
+</div>
+
+<div class="test">
+  <div class="test-title">Test 3 — Does the Gemini API key actually work?</div>
+  <div class="status pending" id="t3status">Not run yet</div>
+  <div class="detail" id="t3detail"></div>
+  <div class="fix" id="t3fix">
+    The API key was rejected by Google. To fix:<br>
+    • Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> and create a <strong>new</strong> key<br>
+    • Make sure you copied the full key with no extra spaces<br>
+    • Update the <code>GEMINI_API_KEY</code> environment variable in Netlify with the new key<br>
+    • Redeploy after changing it
+  </div>
+</div>
+
+<div class="test">
+  <div class="test-title">Test 4 — Does the AI return valid painting advice?</div>
+  <div class="status pending" id="t4status">Not run yet</div>
+  <div class="detail" id="t4detail"></div>
+  <div class="fix" id="t4fix">
+    The AI responded but the format was unexpected. This is usually a temporary issue — try again in a moment.
+    If it keeps failing, the proxy function may need to be re-uploaded.
+  </div>
+</div>
+
+<script>
+function setStatus(id, state, message, detail, showFix) {
+  const el = document.getElementById(id + 'status');
+  const det = document.getElementById(id + 'detail');
+  const fix = document.getElementById(id + 'fix');
+  el.className = 'status ' + state;
+  el.textContent = message;
+  if (detail) det.textContent = detail;
+  if (showFix) fix.style.display = 'block';
+}
+
+async function runAll() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  // Reset all
+  ['t1','t2','t3','t4'].forEach(id => {
+    setStatus(id, 'pending', 'Waiting…', '', false);
+  });
+
+  // ── TEST 1: Can we reach the proxy at all? ──────────────────────
+  setStatus('t1', 'running', '⏳ Checking…');
+  let proxyReachable = false;
+  try {
+    const r = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt: 'test', userMessage: 'test' }),
+    });
+
+    proxyReachable = true;
+
+    if (r.status === 404) {
+      setStatus('t1', 'fail', '❌ FAIL — Function not found (404)', 
+        `The /api/claude endpoint returned 404. The netlify/functions/claude.js file is either missing from your repo or the netlify.toml isn't configured correctly.`, true);
+      btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
+    }
+
+    setStatus('t1', 'pass', '✅ PASS — Proxy function is reachable');
+
+    // ── TEST 2: Is the API key set? ─────────────────────────────────
+    setStatus('t2', 'running', '⏳ Checking…');
+    const data = await r.json();
+
+    if (r.status === 500 && data.error && data.error.includes('GEMINI_API_KEY')) {
+      setStatus('t2', 'fail', '❌ FAIL — GEMINI_API_KEY environment variable is not set',
+        `Server response: "${data.error}"`, true);
+      setStatus('t3', 'pending', 'Skipped (fix Test 2 first)');
+      setStatus('t4', 'pending', 'Skipped (fix Test 2 first)');
+      btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
+    }
+
+    setStatus('t2', 'pass', '✅ PASS — API key environment variable is set');
+
+    // ── TEST 3: Did Gemini accept the key? ──────────────────────────
+    setStatus('t3', 'running', '⏳ Checking…');
+
+    if (r.status !== 200) {
+      const errMsg = data.error || JSON.stringify(data);
+      setStatus('t3', 'fail', `❌ FAIL — Gemini rejected the request (HTTP ${r.status})`,
+        `Error: ${errMsg}`, true);
+      setStatus('t4', 'pending', 'Skipped (fix Test 3 first)');
+      btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
+    }
+
+    if (!data.text) {
+      setStatus('t3', 'fail', '❌ FAIL — Gemini returned an empty response',
+        `Full response: ${JSON.stringify(data)}`, true);
+      setStatus('t4', 'pending', 'Skipped (fix Test 3 first)');
+      btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
+    }
+
+    setStatus('t3', 'pass', '✅ PASS — Gemini API key is valid and working');
+
+    // ── TEST 4: Now send a real painting prompt ─────────────────────
+    setStatus('t4', 'running', '⏳ Asking AI for painting advice…');
+
+    const r2 = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt: 'You are a Warhammer painting expert. Respond with valid JSON only, no markdown.',
+        userMessage: 'Paint:"Mephiston Red"(#9A1115). Return ONLY JSON: {"colourName":"","description":"","technique":"","baseCoats":[{"name":"","hex":"","role":""}]}'
+      }),
+    });
+
+    const d2 = await r2.json();
+
+    if (!d2.text) {
+      setStatus('t4', 'fail', '❌ FAIL — AI returned no text on real prompt',
+        `Response: ${JSON.stringify(d2)}`, true);
+      btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
+    }
+
+    // Try to parse JSON
+    try {
+      const cleaned = d2.text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      setStatus('t4', 'pass', '✅ PASS — AI is working perfectly!',
+        `Sample response: colourName="${parsed.colourName}", description="${parsed.description}"`);
+    } catch(e) {
+      setStatus('t4', 'fail', '❌ FAIL — AI responded but JSON was malformed',
+        `Raw response: ${d2.text.slice(0, 300)}`, true);
+    }
+
+  } catch (err) {
+    if (!proxyReachable) {
+      setStatus('t1', 'fail', '❌ FAIL — Could not reach the proxy function at all',
+        `Network error: ${err.message}\n\nThis usually means the netlify/functions/claude.js file is missing, or the site hasn't been redeployed after adding it.`, true);
+    } else {
+      setStatus('t4', 'fail', '❌ FAIL — Unexpected error', err.message, true);
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Run Diagnostics Again';
+}
+</script>
+</body>
+</html>
