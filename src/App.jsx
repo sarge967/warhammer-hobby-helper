@@ -422,16 +422,21 @@ body{background:#0a0806;color:#e8d5b0;font-family:'Crimson Pro',Georgia,serif;mi
 
 // ─── COLOUR THEORY TAB ───────────────────────────────────────────
 function isHex(h){return /^#[0-9A-Fa-f]{6}$/.test(h);}
-// ─── API KEY: Add yours here when self-hosting ────────────────────
-// Get a free key at https://console.anthropic.com
-// Then replace YOUR_KEY_HERE below, OR set VITE_ANTHROPIC_API_KEY
-// in your Netlify/Vercel environment variables (recommended).
-const API_KEY = (typeof import.meta !== "undefined" && import.meta.env?.VITE_ANTHROPIC_API_KEY) || "YOUR_KEY_HERE";
-
-async function callClaude(msgs,sys){
-  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:msgs})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message);
-  return d.content.map(b=>b.text||"").join("");
+// Calls the Netlify proxy (/netlify/functions/claude.js)
+// which uses the FREE Google Gemini API.
+// Set GEMINI_API_KEY in Netlify → Site configuration → Environment variables.
+// Get a free key at: https://aistudio.google.com/app/apikey
+async function callClaude(msgs, sys) {
+  // msgs is an array; grab the last user message content as the prompt
+  const userMessage = msgs.map(m => (typeof m.content === "string" ? m.content : m.content.map(c => c.text || "").join(""))).join("\n");
+  const r = await fetch("/api/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemPrompt: sys, userMessage }),
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d.text || "";
 }
 
 function ColourTab({owned}){

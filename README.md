@@ -1,165 +1,74 @@
 # ⚔ Warhammer Hobby Helper
 
-A free, installable Progressive Web App (PWA) for Warhammer 40K painters. Works on **iPhone, Android, and desktop** — no app store required.
+A free, installable Progressive Web App (PWA) for Warhammer 40K painters.
+Works on **iPhone, Android, and desktop** — no app store required.
 
 ## Features
 
-- 🎨 **Colour Theory** — Browse all ~220 Citadel paints, pick any colour, get AI-powered painting guides
-- 📦 **Inventory** — Track which paints and brushes you own, generate a shopping list
+- 🎨 **Colour Theory** — Browse all ~220 Citadel paints, get AI-powered painting guides
+- 📦 **Inventory** — Track paints and brushes, generate a shopping list
 - 🖌️ **Brushes** — Beginner-friendly guides to every Citadel brush
 - 🎭 **Schemes** — 4 curated paint schemes for all 13 Warhammer 40K armies
-- 📖 **Beginner Tips** — 30+ tips covering techniques, tools, and common mistakes
+- 📖 **Beginner Tips** — 30+ tips on techniques, tools, and common mistakes
 - 📋 **Project Planner** — Track army projects, units, and painting progress
 
 ---
 
-## Deployment (Share with anyone in ~10 minutes)
+## Getting the Colour Theory tab working (FREE)
 
-### Option A — Netlify (Recommended, Easiest)
+The AI features use **Google Gemini**, which is completely free — no credit card needed.
 
-1. **Create a free account** at [netlify.com](https://netlify.com)
+### Step 1 — Get your free API key (2 minutes)
+1. Go to **https://aistudio.google.com/app/apikey**
+2. Sign in with a Google account
+3. Click **Create API key**
+4. Copy the key (it looks like `AIzaSy...`)
 
-2. **Create a GitHub account** (free) at [github.com](https://github.com) if you don't have one
+### Step 2 — Add it to Netlify
+1. In your Netlify dashboard, open your site
+2. Go to **Site configuration → Environment variables**
+3. Click **Add a variable**
+   - Key: `GEMINI_API_KEY`
+   - Value: the key you copied
+4. Click **Save**
 
-3. **Upload the project to GitHub:**
-   - Go to [github.com/new](https://github.com/new)
-   - Name the repo `warhammer-hobby-helper`, click **Create repository**
-   - On the next page, click **uploading an existing file**
-   - Drag in ALL the files from this folder (keeping the folder structure)
-   - Click **Commit changes**
-
-4. **Connect to Netlify:**
-   - In Netlify, click **Add new site → Import an existing project**
-   - Choose **GitHub** and select your `warhammer-hobby-helper` repo
-   - Build command: `npm run build`
-   - Publish directory: `dist`
-   - Click **Deploy site**
-
-5. **Done!** Netlify gives you a URL like `https://warhammer-hobby-helper.netlify.app`
-   - You can set a custom name in **Site settings → Change site name**
+### Step 3 — Redeploy
+1. Go to **Deploys → Trigger deploy → Deploy site**
+2. Wait ~1 minute — done!
 
 ---
 
-### Option B — Vercel (Also very easy)
+## Deploying for the first time (GitHub + Netlify)
 
-1. Create a free account at [vercel.com](https://vercel.com)
-2. Click **Add New → Project**
-3. Import your GitHub repo (same steps as above to create it)
-4. Vercel auto-detects Vite — just click **Deploy**
-5. Your app is live at `https://warhammer-hobby-helper.vercel.app`
+1. Create a GitHub repo at https://github.com/new named `warhammer-hobby-helper`
+2. Upload all files from this folder (keeping the folder structure)
+3. Go to https://netlify.com → **Add new site → Import from GitHub**
+4. Select your repo — Netlify auto-detects the settings → click **Deploy**
+5. Add the `GEMINI_API_KEY` environment variable (Step 2 above)
+6. Trigger a redeploy
 
----
+## Installing on iPhone
+Open your Netlify URL in **Safari** → Share button → **Add to Home Screen** → Add
 
-### Option C — Netlify Drop (Fastest, no GitHub needed)
-
-1. On your computer, open a terminal in this folder and run:
-   ```
-   npm install
-   npm run build
-   ```
-2. This creates a `dist/` folder
-3. Go to [app.netlify.com/drop](https://app.netlify.com/drop)
-4. Drag the `dist/` folder onto the page
-5. Instant deployment — you get a live URL immediately
-
-> **Note:** You'll need Node.js installed for this option. Download it free at [nodejs.org](https://nodejs.org)
+## Installing on Android
+Open your Netlify URL in **Chrome** → three-dot menu → **Install app**
 
 ---
 
-## Installing on iPhone (Add to Home Screen)
+## How the secure proxy works
 
-Once the app is deployed:
+The app calls `/api/claude` — a small Netlify Function (`netlify/functions/claude.js`)
+that runs on Netlify's servers. It adds your secret API key and calls Google Gemini.
+Your key is never sent to the browser or visible to users.
 
-1. Open the URL in **Safari** on iPhone
-2. Tap the **Share** button (box with arrow at bottom of screen)
-3. Scroll down and tap **Add to Home Screen**
-4. Tap **Add**
-
-The app will appear on your home screen with its own icon, and opens full-screen like a native app. It also works offline once loaded.
-
-## Installing on Android (Add to Home Screen)
-
-1. Open the URL in **Chrome** on Android
-2. Tap the **three-dot menu** (top right)
-3. Tap **Add to Home screen** or **Install app**
-4. Tap **Install**
-
----
-
-## Important: Anthropic API Key
-
-The **Colour Theory** tab uses the Claude AI API for paint analysis. The app currently makes requests to the Anthropic API without an API key in the code — this works inside the Claude.ai artifact environment but **will not work** when self-hosted.
-
-To make it work when deployed, you need to add your own API key:
-
-1. Get a free API key at [console.anthropic.com](https://console.anthropic.com)
-2. Open `src/App.jsx` and find the `callClaude` function (~line 487)
-3. Add your API key to the headers:
-   ```js
-   headers: {
-     "Content-Type": "application/json",
-     "x-api-key": "YOUR_API_KEY_HERE",
-     "anthropic-version": "2023-06-01",
-     "anthropic-dangerous-direct-browser-access": "true"
-   }
-   ```
-
-> ⚠️ **Security note:** Embedding an API key in a public app means anyone can see it. For a private app shared only with friends, this is acceptable. For a fully public app, you'd want to set up a small backend proxy. See [Anthropic's docs](https://docs.anthropic.com) for details.
-
-Alternatively, the **Inventory, Brushes, Schemes, Tips, and Project Planner** tabs all work completely offline and need no API key at all.
-
----
-
-## Local Development
+## Local development
 
 ```bash
-# Install dependencies
 npm install
+npm run dev        # Basic dev server (AI tab won't work without proxy)
 
-# Start local dev server (opens at http://localhost:5173)
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview the production build locally
-npm run preview
+# To test with AI working locally:
+npm install -g netlify-cli
+echo "GEMINI_API_KEY=your_key_here" > .env.local
+netlify dev        # Runs app + functions at http://localhost:8888
 ```
-
----
-
-## Project Structure
-
-```
-warhammer-hobby-helper/
-├── public/
-│   ├── favicon.ico
-│   ├── icon-192.png        # Android home screen icon
-│   ├── icon-512.png        # Large icon / splash
-│   └── apple-touch-icon.png  # iPhone home screen icon
-├── src/
-│   ├── App.jsx             # The entire application
-│   ├── main.jsx            # React entry point
-│   └── index.css           # Global CSS reset
-├── index.html              # HTML entry point
-├── vite.config.js          # Vite + PWA configuration
-├── package.json            # Dependencies
-├── netlify.toml            # Netlify deployment config
-├── vercel.json             # Vercel deployment config
-└── .gitignore
-```
-
----
-
-## Tech Stack
-
-- **React 18** — UI framework
-- **Vite** — Build tool (fast builds, instant hot reload)
-- **vite-plugin-pwa** — PWA/service worker generation
-- **Claude API (Anthropic)** — AI colour analysis
-
-No other dependencies. The entire app UI is built with inline styles and vanilla React.
-
----
-
-Made with ⚔ for the Warhammer hobby community.
