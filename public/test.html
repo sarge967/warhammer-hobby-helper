@@ -136,22 +136,23 @@ async function runAll() {
     // ── TEST 3: Did Gemini accept the key? ──────────────────────────
     setStatus('t3', 'running', '⏳ Checking…');
 
-    if (r.status !== 200) {
+    if (r.status !== 200 || !data.text) {
+      // Show the full error from Google so we know exactly what's wrong
       const errMsg = data.error || JSON.stringify(data);
+      const hint = errMsg.includes('API_KEY_INVALID') || errMsg.includes('invalid') 
+        ? '\n\nHINT: Your API key appears to be invalid. Go to aistudio.google.com/app/apikey, delete the old key, create a fresh one, and update it in Netlify environment variables.'
+        : errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')
+        ? '\n\nHINT: You have hit the free quota limit. Wait 24 hours or check your usage at aistudio.google.com.'
+        : errMsg.includes('not found') || errMsg.includes('404')
+        ? '\n\nHINT: The Gemini model was not found. The proxy will retry with fallback models automatically.'
+        : '';
       setStatus('t3', 'fail', `❌ FAIL — Gemini rejected the request (HTTP ${r.status})`,
-        `Error: ${errMsg}`, true);
+        `Full error from Google: ${errMsg}${hint}`, true);
       setStatus('t4', 'pending', 'Skipped (fix Test 3 first)');
       btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
     }
 
-    if (!data.text) {
-      setStatus('t3', 'fail', '❌ FAIL — Gemini returned an empty response',
-        `Full response: ${JSON.stringify(data)}`, true);
-      setStatus('t4', 'pending', 'Skipped (fix Test 3 first)');
-      btn.disabled = false; btn.textContent = 'Run Diagnostics'; return;
-    }
-
-    setStatus('t3', 'pass', '✅ PASS — Gemini API key is valid and working');
+    setStatus('t3', 'pass', `✅ PASS — Gemini API key is valid and working (used model: ${data.model || 'unknown'})`);
 
     // ── TEST 4: Now send a real painting prompt ─────────────────────
     setStatus('t4', 'running', '⏳ Asking AI for painting advice…');
