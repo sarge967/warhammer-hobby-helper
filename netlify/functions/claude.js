@@ -4,7 +4,6 @@
 // Key name: GEMINI_API_KEY
 
 export default async (request) => {
-  // Handle CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -23,14 +22,11 @@ export default async (request) => {
     });
   }
 
-  // Get the API key — trim whitespace to catch copy/paste errors
   const apiKey = (Netlify.env.get("GEMINI_API_KEY") || "").trim();
 
   if (!apiKey) {
     return new Response(
-      JSON.stringify({
-        error: "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables and add it, then redeploy.",
-      }),
+      JSON.stringify({ error: "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables and add it, then redeploy." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -38,76 +34,72 @@ export default async (request) => {
   try {
     const { systemPrompt, userMessage } = await request.json();
 
+    // First, fetch the live list of available models from Google
+    // so we always use a valid one regardless of API changes
+    const listResp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    );
+    const listData = await listResp.json();
+
+    if (!listResp.ok) {
+      throw new Error(`Key rejected by Google (HTTP ${listResp.status}): ${listData.error?.message || JSON.stringify(listData)}`);
+    }
+
+    // Find the best available free model — prefer flash models (fast + free)
+    const available = (listData.models || [])
+      .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
+      .map(m => m.name.replace("models/", ""));
+
+    const preferred = [
+      "gemini-2.0-flash",
+      "gemini-2.0-flash-lite",
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-8b",
+      "gemini-1.0-pro",
+    ];
+
+    const model = preferred.find(p => available.includes(p)) || available[0];
+
+    if (!model) {
+      throw new Error(`No usable Gemini models found. Available: ${JSON.stringify(available)}`);
+    }
+
     const geminiBody = {
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userMessage }] }],
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.3,
-      },
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.3 },
     };
 
-    // Try gemini-2.0-flash first (newest free model), fall back to 1.5-flash
-    const models = [
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-latest",
-    ];
-
-    let lastError = null;
-
-    for (const model of models) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-      const response = await fetch(url, {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(geminiBody),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Capture the full Google error message for diagnostics
-        lastError = {
-          model,
-          httpStatus: response.status,
-          googleError: data.error?.message || JSON.stringify(data),
-          googleCode: data.error?.code,
-          googleStatus: data.error?.status,
-        };
-        // If it's an auth error (401/403), no point trying other models
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
-          break;
-        }
-        continue; // try next model
       }
+    );
 
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const data = await response.json();
 
-      if (!text) {
-        lastError = { model, googleError: "Empty response from Gemini", raw: JSON.stringify(data) };
-        continue;
-      }
-
-      // Success!
-      return new Response(
-        JSON.stringify({ text, model }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        }
-      );
+    if (!response.ok) {
+      throw new Error(`Gemini generateContent failed (HTTP ${response.status}): ${data.error?.message || JSON.stringify(data)}`);
     }
 
-    // All models failed — return the detailed error for diagnostics
-    throw new Error(
-      lastError
-        ? `Gemini error (model: ${lastError.model}, HTTP ${lastError.httpStatus}): ${lastError.googleError}`
-        : "All Gemini models failed"
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    if (!text) {
+      throw new Error(`Gemini returned empty text. Full response: ${JSON.stringify(data)}`);
+    }
+
+    return new Response(
+      JSON.stringify({ text, model }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
     );
 
   } catch (err) {
