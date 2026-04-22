@@ -7,146 +7,151 @@
   <style>
     body { font-family: monospace; background: #0a0806; color: #e8d5b0; padding: 24px; max-width: 700px; margin: 0 auto; }
     h1 { color: #c8912a; margin-bottom: 6px; font-size: 18px; }
-    .sub { color: rgba(232,213,176,0.5); margin-bottom: 28px; font-size: 13px; line-height: 1.6; }
+    .sub { color: rgba(232,213,176,0.5); margin-bottom: 28px; font-size: 13px; line-height: 1.7; }
     .test { background: rgba(255,255,255,0.04); border: 1px solid rgba(200,145,42,0.2); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
-    .test-title { color: #c8912a; font-size: 13px; margin-bottom: 10px; }
-    .status { padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-top: 8px; }
+    .test-title { color: #c8912a; font-size: 13px; margin-bottom: 10px; font-weight: bold; }
+    .status { padding: 10px 14px; border-radius: 4px; font-size: 13px; margin-top: 8px; line-height: 1.5; }
     .pending { background: rgba(100,100,100,0.2); color: #aaa; }
     .running { background: rgba(200,145,42,0.15); color: #c8912a; }
-    .pass    { background: rgba(30,115,49,0.2); color: #4ec86a; border: 1px solid rgba(30,115,49,0.4); }
-    .fail    { background: rgba(180,40,40,0.2); color: #e88888; border: 1px solid rgba(200,60,60,0.4); }
+    .pass    { background: rgba(30,115,49,0.2);   color: #4ec86a; border: 1px solid rgba(30,115,49,0.4); }
+    .fail    { background: rgba(180,40,40,0.2);   color: #e88888; border: 1px solid rgba(200,60,60,0.4); }
     button { background: linear-gradient(135deg,#8b4513,#c8912a); border: none; color: #0a0806; font-weight: 700; font-size: 13px; padding: 12px 28px; border-radius: 4px; cursor: pointer; margin-bottom: 24px; font-family: monospace; }
     button:hover { opacity: 0.85; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .detail { font-size: 11px; color: rgba(232,213,176,0.6); margin-top: 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
-    .fix { background: rgba(200,145,42,0.08); border-left: 3px solid #c8912a; padding: 10px 14px; margin-top: 10px; font-size: 12px; color: rgba(232,213,176,0.8); line-height: 1.7; display: none; }
+    .detail { font-size: 12px; color: rgba(232,213,176,0.65); margin-top: 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 4px; }
+    .fix { background: rgba(200,145,42,0.08); border-left: 3px solid #c8912a; padding: 12px 16px; margin-top: 12px; font-size: 13px; color: rgba(232,213,176,0.85); line-height: 1.8; display: none; }
     .fix a { color: #c8912a; }
-    .fix code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; }
+    .fix code { background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+    ol { padding-left: 18px; }
+    ol li { margin-bottom: 4px; }
   </style>
 </head>
 <body>
 
 <h1>⚔ Warhammer Hobby Helper — Diagnostics</h1>
 <p class="sub">
-  This page runs a single test call to check everything is working.<br>
-  It only makes <strong>one API request</strong> to avoid hitting rate limits.
+  This page sends a single test request to check the AI connection is working.<br>
+  The app now uses <strong>OpenRouter</strong> (free, no credit card needed).<br>
+  If you were previously using Google Gemini, you need a new key — see the fix instructions below.
 </p>
 
-<button id="runBtn" onclick="runTest()">Run Diagnostic Test</button>
+<button id="runBtn" onclick="runTest()">Run Test</button>
 
 <div class="test">
-  <div class="test-title">Test — Proxy reachable, API key valid, AI responding?</div>
+  <div class="test-title">Connection Test — proxy reachable + API key valid + AI responding</div>
   <div class="status pending" id="status">Not run yet</div>
-  <div class="detail" id="detail"></div>
+  <div class="detail" id="detail" style="display:none"></div>
   <div class="fix" id="fix"></div>
 </div>
 
 <script>
 function setStatus(state, message, detail, fixHtml) {
-  document.getElementById('status').className = 'status ' + state;
-  document.getElementById('status').textContent = message;
-  if (detail) document.getElementById('detail').textContent = detail;
-  if (fixHtml) {
-    document.getElementById('fix').innerHTML = fixHtml;
-    document.getElementById('fix').style.display = 'block';
-  }
+  const s = document.getElementById('status');
+  const d = document.getElementById('detail');
+  const f = document.getElementById('fix');
+  s.className = 'status ' + state;
+  s.textContent = message;
+  if (detail) { d.textContent = detail; d.style.display = 'block'; }
+  if (fixHtml) { f.innerHTML = fixHtml; f.style.display = 'block'; }
 }
 
 async function runTest() {
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
-  btn.textContent = 'Running…';
-  document.getElementById('detail').textContent = '';
+  btn.textContent = 'Testing…';
+  document.getElementById('detail').style.display = 'none';
   document.getElementById('fix').style.display = 'none';
+  document.getElementById('detail').textContent = '';
 
-  setStatus('running', '⏳ Sending one test request…');
+  setStatus('running', '⏳ Sending test request…');
 
   try {
     const r = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemPrompt: 'You are a Warhammer painting expert. Respond with valid JSON only, no markdown fences.',
-        userMessage: 'Paint:"Mephiston Red"(#9A1115). Return ONLY this JSON: {"colourName":"Mephiston Red","description":"A deep crimson","technique":"Apply thinly in two coats"}'
+        systemPrompt: 'You are a Warhammer painting expert. Reply with JSON only, no markdown.',
+        userMessage: 'Return only this exact JSON: {"colourName":"Mephiston Red","description":"A deep crimson base paint","technique":"Apply in two thin coats"}'
       }),
     });
 
-    // Handle network-level failure
-    if (!r) throw new Error('No response from server — the proxy function may not be deployed.');
-
-    const data = await r.json();
-
-    // ── Proxy not found ──────────────────────────────────────────
+    // ── Function not found ────────────────────────────────────────
     if (r.status === 404) {
-      setStatus('fail', '❌ Proxy function not found (404)',
-        'The /api/claude endpoint does not exist on this deployment.',
-        `The file <code>netlify/functions/claude.js</code> is missing from your GitHub repo, or <code>netlify.toml</code> doesn't have <code>functions = "netlify/functions"</code>.<br><br>
-        Make sure both files are committed to GitHub and trigger a fresh deploy in Netlify → Deploys → Trigger deploy.`
+      setStatus('fail', '❌ Failed — Netlify function not found (404)',
+        'The /.netlify/functions/claude endpoint returned 404.',
+        `The function file isn't being picked up by Netlify. Fix:<ol>
+        <li>Make sure <code>netlify/functions/claude.js</code> exists in your GitHub repo</li>
+        <li>Make sure <code>netlify.toml</code> contains <code>functions = "netlify/functions"</code></li>
+        <li>In Netlify dashboard go to <strong>Functions</strong> tab — do you see "claude" listed?</li>
+        <li>If not, trigger a fresh deploy: Deploys → Trigger deploy → Deploy site</li>
+        </ol>`
       );
-      btn.disabled = false; btn.textContent = 'Run Diagnostic Test'; return;
+      btn.disabled = false; btn.textContent = 'Run Test'; return;
     }
 
-    // ── API key not set ──────────────────────────────────────────
-    if (data.error && data.error.includes('GEMINI_API_KEY not set')) {
-      setStatus('fail', '❌ GEMINI_API_KEY environment variable is missing',
+    let data;
+    try {
+      data = await r.json();
+    } catch(e) {
+      setStatus('fail', '❌ Failed — Function returned non-JSON response',
+        `HTTP status: ${r.status}\nThis usually means the function crashed before it could respond.`,
+        `Check the Netlify function logs: your Netlify site → <strong>Functions</strong> tab → click on "claude" → view logs.`
+      );
+      btn.disabled = false; btn.textContent = 'Run Test'; return;
+    }
+
+    // ── API key missing ───────────────────────────────────────────
+    if (data.error && data.error.includes('OPENROUTER_API_KEY not set')) {
+      setStatus('fail', '❌ Failed — OPENROUTER_API_KEY environment variable is not set',
         data.error,
-        `Go to your Netlify site → <strong>Site configuration → Environment variables</strong><br>
-        Click <strong>Add a variable</strong>:<br>
-        &nbsp;&nbsp;Key: <code>GEMINI_API_KEY</code><br>
-        &nbsp;&nbsp;Value: your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a><br><br>
-        After saving, go to <strong>Deploys → Trigger deploy → Deploy site</strong>.`
+        `The app now uses OpenRouter instead of Google. You need a new free key:<ol>
+        <li>Go to <a href="https://openrouter.ai" target="_blank">openrouter.ai</a> and create a free account</li>
+        <li>Go to <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> and click <strong>Create Key</strong></li>
+        <li>Copy the key (starts with <code>sk-or-...</code>)</li>
+        <li>In Netlify: Site configuration → Environment variables → <strong>Add a variable</strong><br>
+            Key: <code>OPENROUTER_API_KEY</code> &nbsp; Value: your key</li>
+        <li>Also <strong>delete</strong> the old <code>GEMINI_API_KEY</code> variable to keep things clean</li>
+        <li>Deploys → Trigger deploy → Deploy site</li>
+        </ol>`
       );
-      btn.disabled = false; btn.textContent = 'Run Diagnostic Test'; return;
+      btn.disabled = false; btn.textContent = 'Run Test'; return;
     }
 
-    // ── Rate limit ───────────────────────────────────────────────
-    if (data.error && data.error.includes('Rate limit')) {
-      setStatus('fail', '❌ Rate limit hit',
-        data.error,
-        `You've made too many requests in a short time. Wait 1–2 minutes and try again.<br><br>
-        If this keeps happening after a fresh key, make sure you created the key at 
-        <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> 
-        and chose <strong>"Create API key in new project"</strong>.`
-      );
-      btn.disabled = false; btn.textContent = 'Run Diagnostic Test'; return;
-    }
-
-    // ── Any other error from the proxy ───────────────────────────
+    // ── Any other error ───────────────────────────────────────────
     if (data.error) {
-      setStatus('fail', '❌ Error from Gemini',
+      setStatus('fail', '❌ Failed — Error from AI service',
         data.error,
-        `Try these steps in order:<br>
-        1. Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a><br>
-        2. <strong>Delete</strong> your existing key<br>
-        3. Click <strong>Create API key → Create API key in new project</strong><br>
-        4. Copy the new key<br>
-        5. In Netlify: Site configuration → Environment variables → edit <code>GEMINI_API_KEY</code> → paste new key → Save<br>
-        6. Deploys → Trigger deploy → Deploy site<br>
-        7. Wait for deploy to finish, then run this test again`
+        `Try these steps:<ol>
+        <li>Go to <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></li>
+        <li>Delete the existing key and create a fresh one</li>
+        <li>Update <code>OPENROUTER_API_KEY</code> in Netlify environment variables</li>
+        <li>Redeploy and test again</li>
+        </ol>`
       );
-      btn.disabled = false; btn.textContent = 'Run Diagnostic Test'; return;
+      btn.disabled = false; btn.textContent = 'Run Test'; return;
     }
 
-    // ── Success ──────────────────────────────────────────────────
+    // ── Success ───────────────────────────────────────────────────
     if (data.text) {
       setStatus('pass',
-        '✅ Everything is working!',
-        `Model used: ${data.model || 'unknown'}\nSample response: ${data.text.slice(0, 200)}`
+        '✅ Everything is working! The AI is responding correctly.',
+        `AI response preview:\n${data.text.slice(0, 300)}`
       );
-      btn.disabled = false; btn.textContent = 'Run Diagnostic Test'; return;
+      btn.disabled = false; btn.textContent = 'Run Test'; return;
     }
 
-    setStatus('fail', '❌ Unexpected response format', JSON.stringify(data).slice(0, 400));
+    setStatus('fail', '❌ Unexpected response', JSON.stringify(data).slice(0, 400));
 
   } catch (err) {
-    setStatus('fail', '❌ Could not reach the proxy at all',
-      err.message,
-      `Make sure the latest files (including <code>netlify/functions/claude.js</code>) are in your GitHub repo and Netlify has finished deploying.`
+    setStatus('fail',
+      '❌ Failed — Could not reach the function at all',
+      `Error: ${err.message}\n\nThis usually means the deployment hasn't finished yet, or the netlify/functions/claude.js file is missing from your repo.`,
+      `Wait 2 minutes for the deploy to finish, then try again. If it keeps failing, check the Netlify Functions tab to see if "claude" is listed.`
     );
   }
 
   btn.disabled = false;
-  btn.textContent = 'Run Diagnostic Test';
+  btn.textContent = 'Run Test';
 }
 </script>
 </body>
