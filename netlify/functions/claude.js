@@ -1,10 +1,6 @@
 // Netlify Function — proxies to OpenRouter API (free tier, no credit card needed)
-// 1. Create a free account at https://openrouter.ai
-// 2. Go to https://openrouter.ai/keys and click "Create Key"
-// 3. Copy the key (starts with sk-or-...)
-// 4. In Netlify: Site configuration → Environment variables
-//    Add: OPENROUTER_API_KEY = your key
-// 5. Redeploy
+// Get your key at: https://openrouter.ai/keys
+// Add in Netlify: Site configuration → Environment variables → OPENROUTER_API_KEY
 
 exports.handler = async function(event) {
   const headers = {
@@ -32,6 +28,8 @@ exports.handler = async function(event) {
   try {
     const { systemPrompt, userMessage } = JSON.parse(event.body);
 
+    // "openrouter/free" automatically picks whichever free model is available
+    // so this works even when individual free model names change
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -41,8 +39,7 @@ exports.handler = async function(event) {
         "X-Title": "Warhammer Hobby Helper",
       },
       body: JSON.stringify({
-        // meta-llama/llama-3.1-8b-instruct:free — genuinely free, no credits needed
-        model: "meta-llama/llama-3.1-8b-instruct:free",
+        model: "openrouter/free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user",   content: userMessage  },
@@ -72,7 +69,7 @@ exports.handler = async function(event) {
 
     return {
       statusCode: 200, headers,
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text, model: data.model || "openrouter/free" })
     };
 
   } catch (err) {
