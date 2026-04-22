@@ -3,6 +3,13 @@
   publish = "dist"
   functions = "netlify/functions"
 
+# Let the API function handle its own path — must come BEFORE the catch-all
+[[redirects]]
+  from = "/api/claude"
+  to = "/.netlify/functions/claude"
+  status = 200
+
+# Catch-all for the React SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"

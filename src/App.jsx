@@ -429,7 +429,7 @@ function isHex(h){return /^#[0-9A-Fa-f]{6}$/.test(h);}
 async function callClaude(msgs, sys) {
   // msgs is an array; grab the last user message content as the prompt
   const userMessage = msgs.map(m => (typeof m.content === "string" ? m.content : m.content.map(c => c.text || "").join(""))).join("\n");
-  const r = await fetch("/api/claude", {
+  const r = await fetch("/.netlify/functions/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ systemPrompt: sys, userMessage }),
